@@ -4799,6 +4799,7 @@ class CriterionTest(TestBase):
         self.check_forward_only = kwargs.get('check_forward_only', True)
 
     def _get_target(self):
+        raise AssertionError()
         return self._get_arg('target', True)
 
     def __call__(self, test_case):
@@ -4824,6 +4825,7 @@ class CriterionTest(TestBase):
         self._do_extra_tests(test_case, module, input, target)
 
     def test_cuda(self, test_case):
+        raise AssertionError()
         if not TEST_CUDA or not self.should_test_cuda:
             raise unittest.SkipTest('Excluded from CUDA tests')
         try:
@@ -4851,6 +4853,7 @@ class CriterionTest(TestBase):
             pass
 
     def _do_extra_tests(self, test_case, module, input, target):
+        raise AssertionError()
         pass
 
 
