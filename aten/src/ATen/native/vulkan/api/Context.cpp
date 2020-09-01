@@ -295,7 +295,7 @@ Context* initialize() {
 #endif
 
     try {
-      return new Context(Configuration::kEnableValidationLayers);
+      return new Context(true);
     }
     catch (...) {
       return nullptr;
