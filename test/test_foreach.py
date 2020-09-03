@@ -37,6 +37,28 @@ class TestForeach(TestCase):
         self.assertEqual(res, tensors1)
         self.assertEqual(tensors1, expected)
 
+    # Unary ops
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_sqrt(self, device, dtype):
+        tensors = [torch.ones(20, 20, device=device, dtype=dtype) for _ in range(20)]
+
+        res = torch._foreach_sqrt(tensors)
+        torch._foreach_sqrt_(tensors)
+
+        self.assertEqual([torch.sqrt(torch.ones(20, 20, device=device, dtype=dtype)) for _ in range(20)], res)
+        self.assertEqual(tensors, res)
+
+    @dtypes(*[torch.float, torch.double, torch.complex64, torch.complex128])
+    def test_exp(self, device, dtype):
+        tensors = [torch.ones(20, 20, device=device, dtype=dtype) for _ in range(20)]
+
+        res = torch._foreach_exp(tensors)
+        torch._foreach_exp_(tensors)
+
+        self.assertEqual([torch.exp(torch.ones(20, 20, device=device, dtype=dtype)) for _ in range(20)], res)
+        self.assertEqual(tensors, res)
+
+    # Ops with scalar
     @dtypes(*torch.testing.get_all_dtypes())
     def test_int_scalar(self, device, dtype):
         tensors = [torch.zeros(10, 10, device=device, dtype=dtype) for _ in range(10)]
