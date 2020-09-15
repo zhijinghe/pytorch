@@ -31,6 +31,18 @@ void check_foreach_api_restrictions(TensorList tensors1, TensorList tensors2) {
   }
 }
 
+void check_foreach_api_restrictions(TensorList tensors, ScalarList scalars) {
+  TORCH_CHECK(tensors.size() > 0, "Tensor list must have at least one tensor.");
+  TORCH_CHECK(scalars.size() > 0, "Scalar list must have at least one scalar.");
+  TORCH_CHECK(tensors.size() == scalars.size(), "Tensor lists must have the same number of elements as scalar list, got ", tensors.size(), " and ", scalars.size());
+
+  auto expected_dtype = tensors[0].dtype();
+
+  for (int i = 0; i < tensors.size(); i++) {
+    TORCH_CHECK(tensors[i].dtype() == expected_dtype, "All tensors in the tensor list must have the same dtype.");
+  }
+}
+
 // To go via 'fast' path, several conditions must be satisfied
 // - All tensors must be on the same device
 // - All tensors must have strided layout
@@ -70,6 +82,47 @@ bool can_use_fast_route(TensorList tensors, Scalar scalar) {
 
     // integral scalar + boolean tensor will result in integral tensor 
     if (scalar.isIntegral(/*includeBool*/ false) && t.dtype() == at::kBool) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool can_use_fast_route(TensorList tensors, ScalarList scalars) {
+  TORCH_CHECK(tensors.size() > 0, "Tensor list must have at least one tensor.");
+  TORCH_CHECK(tensors.size() == scalars.size(), "Tensor list must have same number of elements as scalar list.");
+  auto expected_device = tensors[0].device();
+
+  for (int i = 0; i < tensors.size(); i++) {
+    if (tensors[i].device() != expected_device) {
+      return false;
+    }
+
+    if (tensors[i].layout() != at::kStrided) {
+      return false;
+    }
+
+    if (tensors[i].device() != expected_device) {
+      return false;
+    }
+
+    if (!tensors[i].is_non_overlapping_and_dense()) {
+      return false;
+    }
+
+    // complex scalar + integral or boolean tensor will result in complex tensor
+    if (scalars[i].isComplex() && at::isIntegralType(tensors[i].scalar_type(), /*includeBool*/ true)) {
+      return false;
+    }
+
+    // float scalar + integral or boolean tensor will result in float tensor
+    if (scalars[i].isFloatingPoint() && at::isIntegralType(tensors[i].scalar_type(), /*includeBool*/ true)) {
+      return false;
+    }
+
+    // integral scalar + boolean tensor will result in integral tensor 
+    if (scalars[i].isIntegral(/*includeBool*/ false) && tensors[i].dtype() == at::kBool) {
       return false;
     }
   }
