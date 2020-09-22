@@ -614,10 +614,11 @@ class TestCudaFuser(JitTestCase):
                     perm1 = range(len(x))
                     self._reduction_helper(x, axes, torch.float32, "cuda", perm0, perm1)
 
-    @unittest.skipIf(not RUN_CUDA, "requires CUDA")
-    @unittest.skipIf(GRAPH_EXECUTOR != ProfilingMode.PROFILING and GRAPH_EXECUTOR !=
-                     ProfilingMode.LEGACY, "Requires fusion optimization pass to be effective")
-    @skipIfRocm
+    # @unittest.skipIf(not RUN_CUDA, "requires CUDA")
+    # @unittest.skipIf(GRAPH_EXECUTOR != ProfilingMode.PROFILING and GRAPH_EXECUTOR !=
+    #                  ProfilingMode.LEGACY, "Requires fusion optimization pass to be effective")
+    # @skipIfRocm
+    @unittest.skip("disable for testing")
     def test_reduction_permutation(self):
         x = [7, 8, 12]
         # note that num_dim is exclusive from len(x), so we are not reducing
