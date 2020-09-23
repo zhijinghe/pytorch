@@ -297,9 +297,9 @@ class TestOptim(TestCase):
             )
 
     def test_multi_tensor_optimizers(self):
-        orig_optimizers = [optim.Adam, optim.AdamW, optim.SGD]
+        orig_optimizers = [optim.Adam, optim.AdamW, optim.SGD, optim.RMSprop]
         mt_optimizers = [optim._multi_tensor.Adam, optim._multi_tensor.AdamW, 
-                         optim._multi_tensor.SGD]
+                         optim._multi_tensor.SGD, optim._multi_tensor.RMSprop]
 
         for opt1, opt2 in zip(orig_optimizers, mt_optimizers):
             optimizers = [opt1, opt2]
@@ -468,16 +468,32 @@ class TestOptim(TestCase):
             optim.Adamax(None, lr=1e-2, betas=(0.0, 1.0))
 
     def test_rmsprop(self):
-        self._test_basic_cases(
-            lambda weight, bias: optim.RMSprop([weight, bias], lr=1e-2)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.RMSprop(
-                self._build_params_dict(weight, bias, lr=1e-3),
-                lr=1e-2)
-        )
-        with self.assertRaisesRegex(ValueError, "Invalid momentum value: -1.0"):
-            optim.RMSprop(None, lr=1e-2, momentum=-1.0)
+        for optimizer in [optim.RMSprop, optim_mt.RMSprop]:
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias], lr=1e-2)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-3),
+                    lr=1e-2)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-3),
+                    lr=1e-2, centered=True)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-3),
+                    lr=1e-2, centered=True, momentum=0.1)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-3),
+                    lr=1e-2, momentum=0.1)
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid momentum value: -1.0"):
+                optimizer(None, lr=1e-2, momentum=-1.0)
 
     def test_asgd(self):
         self._test_basic_cases(
