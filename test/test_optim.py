@@ -297,10 +297,12 @@ class TestOptim(TestCase):
             )
 
     def test_multi_tensor_optimizers(self):
-        orig_optimizers = [optim.Adam, optim.AdamW, optim.SGD, optim.RMSprop, optim.Rprop, optim.ASGD]
+        orig_optimizers = [optim.Adam, optim.AdamW, optim.SGD, optim.RMSprop, optim.Rprop, optim.ASGD,
+                           optim.Adamax]
         mt_optimizers = [optim._multi_tensor.Adam, optim._multi_tensor.AdamW, 
                          optim._multi_tensor.SGD, optim._multi_tensor.RMSprop,
-                         optim._multi_tensor.Rprop, optim._multi_tensor.ASGD]
+                         optim._multi_tensor.Rprop, optim._multi_tensor.ASGD,
+                         optim._multi_tensor.Adamax]
 
         for opt1, opt2 in zip(orig_optimizers, mt_optimizers):
             optimizers = [opt1, opt2]
@@ -457,16 +459,17 @@ class TestOptim(TestCase):
         )
 
     def test_adamax(self):
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adamax([weight, bias], lr=1e-1)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adamax(
-                self._build_params_dict(weight, bias, lr=1e-2),
-                lr=1e-1)
-        )
-        with self.assertRaisesRegex(ValueError, "Invalid beta parameter at index 1: 1.0"):
-            optim.Adamax(None, lr=1e-2, betas=(0.0, 1.0))
+        for optimizer in [optim.Adamax, optim_mt.Adamax]:
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias], lr=1e-1)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-2),
+                    lr=1e-1)
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid beta parameter at index 1: 1.0"):
+                optimizer(None, lr=1e-2, betas=(0.0, 1.0))
 
     def test_rmsprop(self):
         for optimizer in [optim.RMSprop, optim_mt.RMSprop]:
