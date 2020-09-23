@@ -294,33 +294,34 @@ class TestOptim(TestCase):
             [lambda opt: StepLR(opt, gamma=0.99999, step_size=300)]
         )
 
-    def test_adam_step(self):
-        optimizer1 = optim.Adam
-        optimizer2 = optim._multi_tensor.Adam
+    def test_multi_tensor_optimizers(self):
+        orig_optimizers = [optim.Adam, optim.AdamW]
+        mt_optimizers = [optim._multi_tensor.Adam, optim._multi_tensor.AdamW]
 
-        optimizers = [optimizer1, optimizer2]
-        weight_base = torch.randn(10, 5, requires_grad=True, device='cuda')
-        weight = [weight_base, weight_base]
-        bias = [torch.randn(10, requires_grad=True, device='cuda') for _ in range(2)]
-        input = [torch.randn(5, device='cuda') for _ in range(2)]
+        for opt1, opt2 in zip(orig_optimizers, mt_optimizers):
+            optimizers = [opt1, opt2]
+            weight_base = torch.randn(10, 5, requires_grad=True, device='cuda')
+            weight = [weight_base, weight_base]
+            bias = [torch.randn(10, requires_grad=True, device='cuda') for _ in range(2)]
+            input = [torch.randn(5, device='cuda') for _ in range(2)]
 
-        res = []
-        for i in range(2):
-            opt = optimizers[i]([weight[i], bias[i]], lr=1e-3)
-            def fn():
-                opt.zero_grad()
-                y = weight[i].mv(input[i])
-                if y.is_cuda and bias[i].is_cuda and y.get_device() != bias[i].get_device():
-                    y = y.cuda(bias[i].get_device())
-                loss = (y + bias[i]).pow(2).sum()
-                loss.backward()
-                return loss
+            res = []
+            for i in range(2):
+                opt = optimizers[i]([weight[i], bias[i]], lr=1e-3)
+                def fn():
+                    opt.zero_grad()
+                    y = weight[i].mv(input[i])
+                    if y.is_cuda and bias[i].is_cuda and y.get_device() != bias[i].get_device():
+                        y = y.cuda(bias[i].get_device())
+                    loss = (y + bias[i]).pow(2).sum()
+                    loss.backward()
+                    return loss
 
-            for _ in range(1):
-                opt.step(fn)
+                for _ in range(10):
+                    opt.step(fn)
 
-            res.append(fn().item())
-        self.assertEqual(res[0], res[1], atol=1e-1, rtol=1e-1)
+                res.append(fn().item())
+            self.assertEqual(res[0], res[1], atol=1e-0, rtol=1e-0)
 
     def test_adam(self):
         for optimizer in [optim.Adam, optim_mt.Adam]:
@@ -367,17 +368,18 @@ class TestOptim(TestCase):
                 optimizer(None, lr=1e-2, weight_decay=-1)
 
     def test_adamw(self):
-        self._test_basic_cases(
-            lambda weight, bias: optim.AdamW([weight, bias], lr=1e-3)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.AdamW(
-                self._build_params_dict(weight, bias, lr=1e-2),
-                lr=1e-3)
-        )
+        for optimizer in [optim.AdamW, optim_mt.AdamW]:
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias], lr=1e-3)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-2),
+                    lr=1e-3)
+            )
 
-        with self.assertRaisesRegex(ValueError, "Invalid weight_decay value: -1"):
-            optim.AdamW(None, lr=1e-2, weight_decay=-1)
+            with self.assertRaisesRegex(ValueError, "Invalid weight_decay value: -1"):
+                optimizer(None, lr=1e-2, weight_decay=-1)
 
     def test_sparse_adam(self):
         self._test_rosenbrock_sparse(
