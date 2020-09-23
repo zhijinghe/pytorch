@@ -6,6 +6,7 @@ from copy import deepcopy
 import torch
 from torch._six import inf
 import torch.optim as optim
+import torch.optim._multi_tensor as optim_mt
 import torch.nn.functional as F
 from torch.optim import SGD
 from torch.autograd import Variable
@@ -293,48 +294,77 @@ class TestOptim(TestCase):
             [lambda opt: StepLR(opt, gamma=0.99999, step_size=300)]
         )
 
-    def test_adam(self):
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam([weight, bias], lr=1e-3)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam(
-                self._build_params_dict(weight, bias, lr=1e-2),
-                lr=1e-3)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam([weight, bias], lr=1e-3,
-                                            amsgrad=True)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam(
-                self._build_params_dict(weight, bias, lr=1e-2),
-                lr=1e-3, amsgrad=True)
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam(
-                self._build_params_dict(weight, bias, lr=1e-2),
-                lr=1e-3),
-            [lambda opt: ExponentialLR(opt, gamma=0.9)]
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam([weight, bias], lr=1e-3,
-                                            amsgrad=True),
-            [lambda opt: ExponentialLR(opt, gamma=0.9),
-             lambda opt: ReduceLROnPlateau(opt)]
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adam(
-                self._build_params_dict(weight, bias, lr=1e-2),
-                lr=1e-3, amsgrad=True),
-            [lambda opt: StepLR(opt, gamma=0.9, step_size=10),
-             lambda opt: ReduceLROnPlateau(opt)]
-        )
-        with self.assertRaisesRegex(ValueError, "Invalid beta parameter at index 0: 1.0"):
-            optim.Adam(None, lr=1e-2, betas=(1.0, 0.0))
+    def test_adam_step(self):
+        optimizer1 = optim.Adam
+        optimizer2 = optim._multi_tensor.Adam
 
-        with self.assertRaisesRegex(ValueError, "Invalid weight_decay value: -1"):
-            optim.Adam(None, lr=1e-2, weight_decay=-1)
+        optimizers = [optimizer1, optimizer2]
+        weight_base = torch.randn(10, 5, requires_grad=True, device='cuda')
+        weight = [weight_base, weight_base]
+        bias = [torch.randn(10, requires_grad=True, device='cuda') for _ in range(2)]
+        input = [torch.randn(5, device='cuda') for _ in range(2)]
+
+        res = []
+        for i in range(2):
+            opt = optimizers[i]([weight[i], bias[i]], lr=1e-3)
+            def fn():
+                opt.zero_grad()
+                y = weight[i].mv(input[i])
+                if y.is_cuda and bias[i].is_cuda and y.get_device() != bias[i].get_device():
+                    y = y.cuda(bias[i].get_device())
+                loss = (y + bias[i]).pow(2).sum()
+                loss.backward()
+                return loss
+
+            for _ in range(1):
+                opt.step(fn)
+
+            res.append(fn().item())
+        self.assertEqual(res[0], res[1], atol=1e-1, rtol=1e-1)
+
+    def test_adam(self):
+        for optimizer in [optim.Adam, optim_mt.Adam]:
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias], lr=1e-3)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-2),
+                    lr=1e-3)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias], lr=1e-3,
+                                               amsgrad=True)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-2),
+                    lr=1e-3, amsgrad=True)
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-2),
+                    lr=1e-3),
+                [lambda opt: ExponentialLR(opt, gamma=0.9)]
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias], lr=1e-3,
+                                               amsgrad=True),
+                [lambda opt: ExponentialLR(opt, gamma=0.9),
+                 lambda opt: ReduceLROnPlateau(opt)]
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, lr=1e-2),
+                    lr=1e-3, amsgrad=True),
+                [lambda opt: StepLR(opt, gamma=0.9, step_size=10),
+                 lambda opt: ReduceLROnPlateau(opt)]
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid beta parameter at index 0: 1.0"):
+                optimizer(None, lr=1e-2, betas=(1.0, 0.0))
+
+            with self.assertRaisesRegex(ValueError, "Invalid weight_decay value: -1"):
+                optimizer(None, lr=1e-2, weight_decay=-1)
 
     def test_adamw(self):
         self._test_basic_cases(
