@@ -298,11 +298,11 @@ class TestOptim(TestCase):
 
     def test_multi_tensor_optimizers(self):
         orig_optimizers = [optim.Adam, optim.AdamW, optim.SGD, optim.RMSprop, optim.Rprop, optim.ASGD,
-                           optim.Adamax]
+                           optim.Adamax, optim.Adadelta]
         mt_optimizers = [optim._multi_tensor.Adam, optim._multi_tensor.AdamW, 
                          optim._multi_tensor.SGD, optim._multi_tensor.RMSprop,
                          optim._multi_tensor.Rprop, optim._multi_tensor.ASGD,
-                         optim._multi_tensor.Adamax]
+                         optim._multi_tensor.Adamax, optim._multi_tensor.Adadelta]
 
         for opt1, opt2 in zip(orig_optimizers, mt_optimizers):
             optimizers = [opt1, opt2]
@@ -403,21 +403,22 @@ class TestOptim(TestCase):
     # ROCm precision is too low to pass this test
     @skipIfRocm
     def test_adadelta(self):
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adadelta([weight, bias])
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adadelta(
-                self._build_params_dict(weight, bias, rho=0.95))
-        )
-        self._test_basic_cases(
-            lambda weight, bias: optim.Adadelta(
-                self._build_params_dict(weight, bias, rho=0.95)),
-            [lambda opt: StepLR(opt, gamma=0.9, step_size=10),
-             lambda opt: ReduceLROnPlateau(opt)]
-        )
-        with self.assertRaisesRegex(ValueError, "Invalid rho value: 1.1"):
-            optim.Adadelta(None, lr=1e-2, rho=1.1)
+        for optimizer in [optim.Adadelta, optim_mt.Adadelta]:
+            self._test_basic_cases(
+                lambda weight, bias: optimizer([weight, bias])
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, rho=0.95))
+            )
+            self._test_basic_cases(
+                lambda weight, bias: optimizer(
+                    self._build_params_dict(weight, bias, rho=0.95)),
+                [lambda opt: StepLR(opt, gamma=0.9, step_size=10),
+                lambda opt: ReduceLROnPlateau(opt)]
+            )
+            with self.assertRaisesRegex(ValueError, "Invalid rho value: 1.1"):
+                optimizer(None, lr=1e-2, rho=1.1)
 
     def test_adagrad(self):
         self._test_basic_cases(
