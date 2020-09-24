@@ -5,6 +5,7 @@
 
 #include <ATen/ThreadLocalState.h>
 #include <ATen/core/ivalue.h>
+#include <torch/csrc/jit/frontend/source_range.h>
 #include <torch/csrc/WindowsTorchApiMacro.h>
 
 namespace at {
@@ -125,6 +126,9 @@ struct InterpreterContinuation {
 // this will cause the TensorType to have requires_grad=False.
 TORCH_API at::TensorTypePtr tensorTypeInCurrentExecutionContext(
     const at::Tensor& t);
+
+// current (TLS) TorchScript interpreter callstack
+TORCH_API std::vector<StackEntry> currentCallstack();
 
 } // namespace jit
 } // namespace torch
